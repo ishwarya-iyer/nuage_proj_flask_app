@@ -1,158 +1,275 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
-    <script>
-        $(document).ready(function(){
-            $(".hide").hide();
-            $(':radio').change(function(){
-                var isChecked = $(this).prop('checked');
-                var isShow = $(this).hasClass('hide_class');
-                
-                $(".cidr_class").toggle(isChecked && isShow);
-                $("#subnet_id").toggle(isChecked && !isShow);
-                
-                if($(this).val()==1)
-                    {
-                        $("#cidr").val('');
-                        $("#mask").prop("required", true);
-                    }
-                else 
-                    if($(this).val()=="2")
-                    {
-                        $("#mask").val('');
-                        $("#cidr").prop("required", true);
-                    }
-                });
+#!/usr/bin/python
+import os
+from flask import Flask, render_template, request
+from werkzeug import secure_filename
+from werkzeug.datastructures import FileStorage
+from flask import send_from_directory
+import dateutil
+from datetime import datetime
 
-            $( "#submit" ).click(function() {
-                var ip_val=$("#ip").val();
-                var ip_split= ip_val.split(".");
+app = Flask(__name__)
 
-                if(ip_split.length!=4)
-                {
-                    alert("wrong ip format" );
-                    return false;
-                }
-                for(var i=0;i<4;i++)
-                {
-                    if($.isNumeric(ip_split[i])&&ip_split[i]>=0&&ip_split[i]<=255)
-                        continue;
-                    else
-                    {
-                        alert("wrong Ip format");
-                        return false;
-                    }
-                }
-                if ( $( "#choice:checked").val() == "2" )
-                {
-                    var cidr_val= $( "#cidr").val();
-                    if ( cidr_val < 32 && /^\d+$/.test(cidr_val));
-                    else
-                    {
-                        alert("wrong CIDR format");
-                        return false;
-                    }
-                }
-                if ( $( "#choice:checked").val() == "1" )
-                {
-                    var mask_val=$("#mask").val();
-                    if((mask_val.match(/\./g)).length!=3)
-                    {
-                        alert("wrong mask");
-                        return false;
-                    }
-                    var mask_split= mask_val.split(".");
-                    var se1=0;var binary="";var final_bin="";
-                    for (var i=0;i<=3;i++)
-                      {
-                       var pos=0;
-                       mask_group=mask_split[i];
-                       while(mask_group>0)
-                        { 
-                            pos++;
-                            binary=(mask_group%2)+""+binary;
-                            mask_group=parseInt(mask_group/2);
-                        }
-                        while(pos<=7)
-                        {
-                            binary="0"+binary;
-                            pos++;
-                        }
-                          final_bin+= binary;
-                          binary="";
-                      } //end of for 
-                    binary= final_bin;
-                
-                //to check if first occurenxt of 1 is not at the first position    
-                if(binary.indexOf("1")>0)
-                  {
-                      alert("wrong mask format");
-                      return false;
-                  }
-                    
-                  //check if 1 is presnt in the mask
-                   if(binary.indexOf("1")==0)
-                     {
-                      se1=1;  //check for 1 after the 0th position
-                      var set0=binary.indexOf("0");
+UPLOAD_FOLDER = '/tmp/'
+ALLOWED_EXTENSIONS = set(['txt'])
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-                      if(binary.indexOf("1",se1)!=-1)
-                       {
-                         alert("wrong mask format");
-                           return false;
-                       }
-                      }
-                    }
-                 
-               $.ajax({
-            url: '/prob1_solution',
-            data: $('form').serialize(),
-            type: 'POST',
-            success: function(response) {
-               $("#output").html(response);
-            },
-            error: function(error) {
-                $("#output").html(error);
-            }
-            });
-        });
-    });
-    </script>
-</head>
-<body>
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
-<form id="myForm" method="POST" action="http://localhost:5000/prob1_solution">
-    <fieldset>
-        <legend>Problem 1:</legend>
-        <table style="text-align:center; margin-left:25%">
-            <tr>
-                <td>IP Address:</td>
-                <td><input type="text" name="ip" id="ip" title="Enter valid IP address" placeholder="XXX.XXX.XXX.XXX" required></td>
-            </tr>
-            <tr>
-                <td> Subnet mast  <input type ="radio" name="choice" id="choice" value="1" checked></td>
-                <td> CIDR  <input type ="radio" name="choice" class="hide_class" id="choice" value="2"></td>
-            </tr>
+@app.route("/")
+def main():
+"""rendering the index page"""
+    return render_template('index.html')
 
-            <tr id="subnet_id">
-                <td>Subnet Mask:</td>
-                <td><input type="text" name="mask" id="mask" title="Enter valid subnet mask" placeholder="XXX.XXX.XXX.XXX"required></td>
-            </tr>
 
-            <tr class="cidr_class" style="display:none">
-                <td></td>
-                <td>/</td>
-            </tr>
+def create_mask(x):
+"""creating subnet mask from CIDR"""
+    mask=''
+    for i in range(1,33):
+        if int(i) <= int(x) :
+            mask='1'+mask
+        else:
+            mask='0'+mask
+    subnet_mask=''
+    sum=0
+    count=0
+    digit_location=0
+    for i in mask:
+        #converting binary to decimal
+        sum+=(2**digit_location)*int(i)
+        digit_location+=1
+        if digit_location%8==0:
+            if count<=2:
+                subnet_mask=str(sum)+subnet_mask   #adding to get the octal sum
+                subnet_mask=str('.')+subnet_mask   #placing the '.'
+                count+=1
+            else:
+                subnet_mask=str(sum)+subnet_mask
+            sum=0
+            digit_location=0
+    return subnet_mask
 
-            <tr class="cidr_class" style="display:none">
-                <td>CIDR:</td>
-                <td><input type="text" name="cidr" id="cidr" ></td>
-            </tr>
-        </table>
-        <input type="submit" value="Submit" id="submit" style="text-align:center">
-    </fieldset>
-</form>
-<div id="output"></div>
-</body>
-</html>
+
+
+def make_binary(x):
+"""converting from decimal to binary"""
+    binary=''
+    while x>0:
+        binary=str(x%2)+binary
+        x=x/2
+    return binary
+
+
+#x = ip address y= subnet mask
+def validate(x,y):
+"""validating the ip address and subnet mask""" 
+    x_group=x.split(".")
+    y_group=y.split(".")  
+    
+    #checking id 4 groups are present
+    if len(x_group) != 4:
+        return bool(0)
+    if len(y_group) != 4:
+        return bool(0)
+    err = bool(1)
+    binary = ""
+    #validating subnet mask
+    for i in y_group:
+        if i.isdigit():
+            if not int(i) > 256:
+                #converting to binary and checking for consecutive 1's
+                binary =binary + str(make_binary(int(i)))
+                if len(binary)<= 7:
+                    for i in range (len(binary),9):
+                        binary = binary + "0"
+            else:                           #number is greater than 255
+                return bool(0)
+        else:                               #number is not a digit
+            return bool(0)
+    
+    #found first occurence after 0th position 
+    if binary.find("1") > 0:
+        return bool(0)
+    step1 = binary.find("1")
+    if step1 != -1:
+        # 1 is present in subnet mask
+        if step1 != 0:
+            return bool(0)
+        step0 = binary.find("0")
+        if step0 != -1:
+            if binary.find("1",step0) != -1:
+                return bool(0)               # found 1 after 0
+    #validating ip address checking if it is in the range 0-255
+    for i in x_group:
+        if i.isdigit():
+            if not int(i) > -1:
+                err = bool(0)
+            if not int(i) < 256:
+                err = bool(0)
+        else:
+            err = bool(0)
+
+    return err
+
+
+
+@app.route('/uploader', methods = ['GET', 'POST'])
+def upload_file():
+"""upload the file and parse it to get  the required keywords"""
+    if request.method == 'POST':
+        f = request.files['file']
+        f.save(secure_filename(f.filename))
+        answer = ""
+        error_format = 0
+        count = 0
+        for line in open(f.filename):  # opened in text-mode; all EOLs are converted to '\n'
+            line = line.rstrip('\n')
+            count += 1
+            date_status = line[:line.find("[")].strip(" ")
+            components = date_status.split(" ")
+            log_level = ['ERROR','INFO','DEBUG']
+            if not components[-1] in log_level:
+                log_status = "false"
+                error_format = 1
+            else:
+                #capturing log level
+                log_status = components[-1]
+                timelog = date_status[:date_status.find(components[-1])].strip(" ")
+            #checking the time against the various formats
+            try:
+                datefield = datetime.utcnow().strptime(timelog,'%Y-%m-%d %H:%M:%S,%f')
+            except:
+                try:
+                    datefield = dateutil.parser.parse(timelog)
+                except:
+                    try:
+                        datefield = datetime.utcnow().strptime(timelog,'%d-%m-%Y %H:%M:%S,%f')
+                    except:
+                        try:
+                            datefield = datetime.utcnow().strptime(timelog,'%m-%d-%Y %H:%M:%S,%f')
+                        except:
+                            try:
+                                datefield = datetime.utcnow().strptime(timelog,'%Y-%d-%m %H:%M:%S,%f')
+                            except:
+                                datefield = "false"
+            if datefield == "false":
+                error_format = 1
+            else:
+                if timelog.find(',')!=-1:
+                    milisec = int(timelog[timelog.find(',')+1:])
+                #%f captures the microseconds, hence this test is necessary
+                if milisec > 1000:     
+                    datefield == "false"
+                    error_format = 1
+                else:
+                    #timelog is captured the next field is the [user:main:sub] group which are tested together
+                    rest=line[line.find("["):]
+                    func_msg=rest.split(" ")
+                    line1= func_msg[0]
+                    main=""
+                    user=""                           
+                    subfunc=""
+                    if line1.find('[') != 0:    # the bracket is missing
+                        user_func = "false"     
+                        error_format = 1
+                    else:
+                        if line1.find(':') == 1:            #user is absent
+                            user = "false"
+                            error_format = 1
+                        else:
+                            user = line1[1:line1.find(':')]
+                            if(line1.count(':')) == 1:          #subfunc is absent
+                                main = line[(line1.find(':')+1):line1.find(']')]
+                                subfunc = "undefined"
+                            else:
+                                print user
+                                if(line1.count(':'))==2:
+                                    secondcolon = line1.find(':',(line1.find(':')+1))
+                                    main = line1[(line1.find(':')+1):secondcolon]
+                                    subfunc = line1[secondcolon+1:-1]
+                                else:                           #invalid format
+                                    user_func = "false"
+                                    error_format = 1
+                    if line1[-1] != ']':                #closing bracket missing
+                        user_func = "false"
+                        error_format = 1
+                    if not main:                        #main function missing
+                        main = "false"
+                        error_format = 1
+                    if not subfunc:
+                        subfunc = "false"               
+                        error_format = 1
+                    msg=line[line.find(']')+1:].strip(" ")      #the rest of the line
+                    # the flaf is not set
+                    if error_format == 0:
+                        answer += "<br><br>Line "+str(count)+") <strong>Date: </strong>"+str(timelog)+"<br><strong>Log Status: </STRONG><br>"+str(log_status)
+                        answer+= "<br><strong>User: </strong>"+str(user)+"<br><strong>Main Function: </strong><br>"+str(main)+"<strong>Subfunction:  </strong>"+str(subfunc)                    
+                        answer+= "<br><strong>Message: </strong><br>"+str(msg)
+                    #flag is set                            
+                    else:
+                        answer+= "<br><br>Line "+ str(count)+") wrong log"
+            
+        return answer
+
+@app.route('/problem1')
+def prob1():
+"""rendering the page of the first problem"""    
+    return render_template('problem1.html')
+
+@app.route('/problem2')
+def prob2():
+"""rendering the page of the second problem"""
+    return render_template('problem2.html')
+
+@app.route('/prob1_solution',methods=['POST','GET'])
+def index():
+"""rendering the solution of the first problem"""
+    # read the posted values from the UI
+    _ip = request.form['ip']
+    _mask = request.form['mask']
+    _cidr = request.form['cidr']
+    #convert cidr to subnet_mask usking create_mask() 
+    if _cidr:
+        if not _cidr.isnumeric():
+            error = 'Invalid input formats</span><br><a href="/">Back</a>'
+            return error
+        _mask=create_mask(_cidr)
+    
+    
+    # validate the received values
+    valid = validate(_ip,_mask)
+    
+    if not valid:
+        error = 'Invalid input formats</span><br><a href="/">Back</a>'
+        print "The given format is invalid"
+        return error
+    else:
+        print "The information given is valid"
+    
+    ip_groups=_ip.split(".")
+    mask_groups=_mask.split(".")
+    network_address = ""
+    host_address = ""
+    print "network_address"
+    counter = 0
+    #calculating the values that is ip & mask for network address and ip & ~mask for host address
+    for x, y in map(None,ip_groups,mask_groups):
+        print x , y
+        network_address += str(int(x) & int(y))
+        host_address += str(int(x) & ~int(y))
+        counter += 1
+        if counter <= 3:
+            network_address += ":"
+            host_address += ":"
+            
+            
+    print "Network address=" + str(network_address)
+    print "Host address=" + str(host_address)
+    response="<span><strong>Network address: "+network_address+"</strong></span><br><span><strong>Host address: "+host_address+"</strong></span><br><br><a href='/'>Back</a>"
+    
+    return response
+    
+    
+if __name__ == "__main__":
+    app.run()
