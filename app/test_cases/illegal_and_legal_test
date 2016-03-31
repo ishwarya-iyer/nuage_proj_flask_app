@@ -1,0 +1,3 @@
+2003-07-08 16:49:45,896 CRITICAL [user1:mainfunction:subfunction] We have a problem
+2003-07-08 16:45,896 ERROR [user1:mainfunction:subfunction] We have a problem
+Fri, 31 Jan 2007 21:12:23 DEBUG [person:define] All systems are a go

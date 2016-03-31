@@ -1,0 +1,3 @@
+23/34/42 34:23:43 ERROr [weekie:function:language] The time and log level both are wrong
+12/23/2001 11:21:12 LOG [Smith:DEVELOPMENT:] SUBFUNCTION IS MISSING
+12/23/2001 11:21:12 DEBUG [SMITH:DEVOPS:SYSTEM] THIS LOG IS CORRECT
